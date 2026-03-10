@@ -5,8 +5,31 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+// ProbeBitrate uses ffprobe to get the audio bitrate of an input file in kbps.
+// Returns 0 if the bitrate cannot be determined (e.g. lossless formats).
+func ProbeBitrate(path string) int {
+	cmd := exec.Command("ffprobe",
+		"-v", "quiet",
+		"-select_streams", "a:0",
+		"-show_entries", "stream=bit_rate",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return 0
+	}
+	bps, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	if err != nil || bps <= 0 {
+		return 0
+	}
+	return bps / 1000 // convert bps → kbps
+}
 
 // EQSettings holds per-band equalization parameters in dB.
 type EQSettings struct {
@@ -163,40 +186,43 @@ func ConvertFormant(inPath, outPath string, ratio float64, eq *EQSettings, tag s
 	}
 
 	// Quality/bitrate control based on output format
+	ext := strings.ToLower(filepath.Ext(outPath))
 	if quality > 0 {
-		ext := strings.ToLower(filepath.Ext(outPath))
 		switch ext {
 		case ".mp3":
-			// quality 1-10 → VBR quality 9-0 (lower = better in lame)
 			vbr := 10 - quality
 			if vbr < 0 {
 				vbr = 0
 			}
 			args = append(args, "-q:a", fmt.Sprintf("%d", vbr))
 		case ".ogg":
-			// quality 1-10 → vorbis quality 0-10
 			args = append(args, "-q:a", fmt.Sprintf("%d", quality))
 		case ".opus":
-			// quality 1-10 → bitrate 48k-320k
 			bitrate := 48 + (quality-1)*30
 			if bitrate > 320 {
 				bitrate = 320
 			}
 			args = append(args, "-b:a", fmt.Sprintf("%dk", bitrate))
 		case ".flac":
-			// quality 1-10 → compression 8-0 (lower number = bigger file, faster decode)
 			comp := 10 - quality
 			if comp < 0 {
 				comp = 0
 			}
 			args = append(args, "-compression_level", fmt.Sprintf("%d", comp))
 		case ".m4a", ".aac":
-			// quality 1-10 → bitrate 64k-320k
 			bitrate := 64 + (quality-1)*28
 			if bitrate > 320 {
 				bitrate = 320
 			}
 			args = append(args, "-b:a", fmt.Sprintf("%dk", bitrate))
+		}
+	} else {
+		// quality=0: preserve source bitrate for lossy formats
+		switch ext {
+		case ".mp3", ".ogg", ".opus", ".m4a", ".aac", ".wma":
+			if srcBitrate := ProbeBitrate(inPath); srcBitrate > 0 {
+				args = append(args, "-b:a", fmt.Sprintf("%dk", srcBitrate))
+			}
 		}
 	}
 
