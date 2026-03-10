@@ -184,6 +184,40 @@ tr:hover { background: #141414; }
   white-space: nowrap;
 }
 
+/* === Confidence Bar === */
+.cell-confidence {
+  min-width: 90px;
+}
+.confidence-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.confidence-track {
+  flex: 1;
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 40px;
+}
+.confidence-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.confidence-pct {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  min-width: 28px;
+  text-align: right;
+}
+.confidence-warn {
+  font-size: 13px;
+  cursor: help;
+  filter: saturate(0.8);
+}
+
 /* === Badges === */
 .badge {
   display: inline-block;

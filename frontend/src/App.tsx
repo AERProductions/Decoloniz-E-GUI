@@ -16,6 +16,8 @@ interface FileEntry {
   size: number;
   extension: string;
   detectedHz?: number;
+  confidence?: number;
+  warning?: string;
   status: 'pending' | 'analyzing' | 'ready' | 'converting' | 'done' | 'skipped' | 'error';
   error?: string;
   ratio?: number;
@@ -25,9 +27,11 @@ interface ConvertResult {
   inputPath: string;
   outputPath: string;
   detectedHz: number;
+  confidence: number;
   targetHz: number;
   ratio: number;
   skipped: boolean;
+  warning?: string;
   error?: string;
 }
 
@@ -80,6 +84,8 @@ function App() {
         setFiles(prev => prev.map((p, j) => j === i ? {
           ...p,
           detectedHz: result.detectedHz,
+          confidence: result.confidence,
+          warning: result.warning || undefined,
           status: result.error ? 'error' : 'ready',
           error: result.error || undefined,
         } : p));
@@ -112,10 +118,10 @@ function App() {
       setFiles(prev => prev.map((f, i) => {
         const r = results[i];
         if (!r) return f;
-        if (r.error) { errors++; return { ...f, status: 'error' as const, error: r.error, detectedHz: r.detectedHz }; }
-        if (r.skipped) { skipped++; return { ...f, status: 'skipped' as const, detectedHz: r.detectedHz, ratio: r.ratio }; }
+        if (r.error) { errors++; return { ...f, status: 'error' as const, error: r.error, detectedHz: r.detectedHz, confidence: r.confidence, warning: r.warning || undefined }; }
+        if (r.skipped) { skipped++; return { ...f, status: 'skipped' as const, detectedHz: r.detectedHz, confidence: r.confidence, warning: r.warning || undefined, ratio: r.ratio }; }
         converted++;
-        return { ...f, status: 'done' as const, detectedHz: r.detectedHz, ratio: r.ratio };
+        return { ...f, status: 'done' as const, detectedHz: r.detectedHz, confidence: r.confidence, warning: r.warning || undefined, ratio: r.ratio };
       }));
       setSummary({ converted, skipped, errors });
     } catch (e: any) {
@@ -153,6 +159,21 @@ function App() {
     };
     const s = map[status] || map.pending;
     return <span className={`badge ${s.cls}`}>{s.label}</span>;
+  };
+
+  const confidenceBar = (conf?: number, warning?: string) => {
+    if (conf === undefined) return <span className="dim">—</span>;
+    const pctVal = Math.round(conf * 100);
+    const color = pctVal >= 70 ? '#4caf50' : pctVal >= 30 ? '#ffc107' : '#f44336';
+    return (
+      <div className="confidence-cell" title={warning || `${pctVal}% confidence`}>
+        <div className="confidence-track">
+          <div className="confidence-fill" style={{ width: `${pctVal}%`, background: color }} />
+        </div>
+        <span className="confidence-pct" style={{ color }}>{pctVal}%</span>
+        {warning && <span className="confidence-warn" title={warning}>⚠</span>}
+      </div>
+    );
   };
 
   const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
@@ -229,6 +250,7 @@ function App() {
                 <th>File</th>
                 <th>Size</th>
                 <th>Detected</th>
+                <th>Confidence</th>
                 <th>Ratio</th>
                 <th>Status</th>
                 <th></th>
@@ -240,6 +262,7 @@ function App() {
                   <td className="cell-name" title={f.path}>{f.name}</td>
                   <td className="cell-size">{formatSize(f.size)}</td>
                   <td className="cell-hz">{f.detectedHz ? `${f.detectedHz.toFixed(2)} Hz` : '—'}</td>
+                  <td className="cell-confidence">{confidenceBar(f.confidence, f.warning)}</td>
                   <td className="cell-ratio">{f.ratio ? f.ratio.toFixed(6) : '—'}</td>
                   <td>{statusBadge(f.status)}</td>
                   <td>
