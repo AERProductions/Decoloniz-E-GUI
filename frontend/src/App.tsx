@@ -59,6 +59,7 @@ function App() {
   // Output format & quality
   const [outputFormat, setOutputFormat] = useState('original');
   const [quality, setQuality] = useState(6);
+  const [sampleRate, setSampleRate] = useState(0);
 
   // Drag-and-drop state
   const [dragging, setDragging] = useState(false);
@@ -196,7 +197,7 @@ function App() {
 
     try {
       const fileInfos = files.map(f => ({ path: f.path, name: f.name, size: f.size, extension: f.extension }));
-      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality);
+      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality, sampleRate);
 
       let converted = 0, skipped = 0, errors = 0;
       setFiles(prev => prev.map((f, i) => {
@@ -214,7 +215,7 @@ function App() {
       EventsOff('conversion-progress');
       setConverting(false);
     }
-  }, [files, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality]);
+  }, [files, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality, sampleRate]);
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
@@ -365,6 +366,16 @@ function App() {
             Quality
             <input type="range" min={1} max={10} step={1} value={quality} onChange={e => setQuality(Number(e.target.value))} />
             <span className="quality-val">{quality} <span className="dim">({qualityLabel(quality)})</span></span>
+          </label>
+          <label>
+            Sample Rate
+            <select value={sampleRate} onChange={e => setSampleRate(Number(e.target.value))} className="input-sm input-format">
+              <option value={0}>Original</option>
+              <option value={44100}>44.1 kHz</option>
+              <option value={48000}>48 kHz</option>
+              <option value={96000}>96 kHz</option>
+              <option value={192000}>192 kHz</option>
+            </select>
           </label>
         </div>
 

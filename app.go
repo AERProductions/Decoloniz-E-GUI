@@ -226,7 +226,7 @@ func (a *App) AnalyzePitch(filePath string, detectorName string) PitchResult {
 
 // --- Conversion ---
 
-func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int) ConvertResult {
+func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int, sampleRate int) ConvertResult {
 	det := pickDetector(detectorName)
 
 	samples, sampleRate, err := audio.DecodeToPCM(inPath)
@@ -277,14 +277,14 @@ func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold fl
 		eq = &audio.EQSettings{Bass: bass, Mid: mid, Treble: treble}
 	}
 
-	if err := audio.ConvertFormant(inPath, outPath, ratio, eq, tag, quality); err != nil {
+	if err := audio.ConvertFormant(inPath, outPath, ratio, eq, tag, quality, sampleRate); err != nil {
 		return ConvertResult{InputPath: inPath, Error: fmt.Sprintf("convert: %v", err)}
 	}
 
 	return ConvertResult{InputPath: inPath, OutputPath: outPath, DetectedHz: detected, Confidence: confidence, TargetHz: targetHz, Ratio: ratio, Warning: warning}
 }
 
-func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int) []ConvertResult {
+func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int, sampleRate int) []ConvertResult {
 	var results []ConvertResult
 	total := len(files)
 
@@ -296,7 +296,7 @@ func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64,
 		})
 
 		outPath := filepath.Join(outputDir, f.Name)
-		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag, bass, mid, treble, outputFormat, quality)
+		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag, bass, mid, treble, outputFormat, quality, sampleRate)
 		results = append(results, r)
 	}
 
