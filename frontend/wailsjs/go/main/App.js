@@ -6,20 +6,28 @@ export function AnalyzePitch(arg1, arg2) {
   return window['go']['main']['App']['AnalyzePitch'](arg1, arg2);
 }
 
-export function ConvertBatch(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['ConvertBatch'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function ConvertBatch(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['ConvertBatch'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
-export function ConvertFile(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['ConvertFile'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function ConvertFile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['ConvertFile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
 export function GetDetectors() {
   return window['go']['main']['App']['GetDetectors']();
 }
 
+export function GetEQPresets() {
+  return window['go']['main']['App']['GetEQPresets']();
+}
+
 export function GetSupportedFormats() {
   return window['go']['main']['App']['GetSupportedFormats']();
+}
+
+export function PreviewFile(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['PreviewFile'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function SelectFiles() {

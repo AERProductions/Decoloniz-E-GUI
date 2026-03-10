@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -63,6 +64,13 @@ type BatchProgress struct {
 	CurrentFile string `json:"currentFile"`
 }
 
+type EQPreset struct {
+	Name   string  `json:"name"`
+	Bass   float64 `json:"bass"`
+	Mid    float64 `json:"mid"`
+	Treble float64 `json:"treble"`
+}
+
 // --- File dialogs ---
 
 func (a *App) SelectFiles() ([]FileInfo, error) {
@@ -111,6 +119,59 @@ func (a *App) GetSupportedFormats() []string {
 	return exts
 }
 
+func (a *App) GetEQPresets() []EQPreset {
+	return []EQPreset{
+		{Name: "Flat", Bass: 0, Mid: 0, Treble: 0},
+		{Name: "Warm", Bass: 3, Mid: 0, Treble: -2},
+		{Name: "Deep", Bass: 6, Mid: -2, Treble: -1},
+		{Name: "Bright", Bass: -1, Mid: 0, Treble: 4},
+	}
+}
+
+// PreviewFile generates a 30-second preview clip with formant-preserving pitch shift
+// and optional EQ, then opens it in the OS default audio player.
+func (a *App) PreviewFile(filePath string, targetHz float64, detectorName string, bass, mid, treble float64) (string, error) {
+	det := pickDetector(detectorName)
+
+	samples, sampleRate, err := audio.DecodeToPCM(filePath)
+	if err != nil {
+		return "", fmt.Errorf("decode: %w", err)
+	}
+
+	chunkSize := 65536
+	if len(samples) < chunkSize {
+		chunkSize = len(samples)
+	}
+	offset := (len(samples) - chunkSize) / 2
+	chunk := samples[offset : offset+chunkSize]
+
+	detected, _, err := det.Detect(chunk, sampleRate)
+	if err != nil {
+		return "", fmt.Errorf("detect: %w", err)
+	}
+
+	ratio := targetHz / detected
+	var eq *audio.EQSettings
+	if bass != 0 || mid != 0 || treble != 0 {
+		eq = &audio.EQSettings{Bass: bass, Mid: mid, Treble: treble}
+	}
+
+	tmpDir := os.TempDir()
+	ext := filepath.Ext(filePath)
+	previewPath := filepath.Join(tmpDir, "decolonize_preview"+ext)
+
+	// Start the preview 30 seconds into the song (or 0 if short)
+	startSec := 30.0
+	if err := audio.GeneratePreview(filePath, previewPath, ratio, eq, startSec, 30.0); err != nil {
+		return "", fmt.Errorf("preview: %w", err)
+	}
+
+	// Open in OS default player
+	exec.Command("cmd", "/c", "start", "", previewPath).Start()
+
+	return previewPath, nil
+}
+
 // --- Analysis ---
 
 func (a *App) AnalyzePitch(filePath string, detectorName string) PitchResult {
@@ -143,7 +204,7 @@ func (a *App) AnalyzePitch(filePath string, detectorName string) PitchResult {
 
 // --- Conversion ---
 
-func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string) ConvertResult {
+func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64) ConvertResult {
 	det := pickDetector(detectorName)
 
 	samples, sampleRate, err := audio.DecodeToPCM(inPath)
@@ -182,14 +243,19 @@ func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold fl
 		return ConvertResult{InputPath: inPath, Error: fmt.Sprintf("mkdir: %v", err)}
 	}
 
-	if err := audio.ConvertWithSampleRate(inPath, outPath, ratio, sampleRate, tag); err != nil {
+	var eq *audio.EQSettings
+	if bass != 0 || mid != 0 || treble != 0 {
+		eq = &audio.EQSettings{Bass: bass, Mid: mid, Treble: treble}
+	}
+
+	if err := audio.ConvertFormant(inPath, outPath, ratio, eq, tag); err != nil {
 		return ConvertResult{InputPath: inPath, Error: fmt.Sprintf("convert: %v", err)}
 	}
 
 	return ConvertResult{InputPath: inPath, OutputPath: outPath, DetectedHz: detected, Confidence: confidence, TargetHz: targetHz, Ratio: ratio, Warning: warning}
 }
 
-func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string) []ConvertResult {
+func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64) []ConvertResult {
 	var results []ConvertResult
 	total := len(files)
 
@@ -201,7 +267,7 @@ func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64,
 		})
 
 		outPath := filepath.Join(outputDir, f.Name)
-		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag)
+		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag, bass, mid, treble)
 		results = append(results, r)
 	}
 

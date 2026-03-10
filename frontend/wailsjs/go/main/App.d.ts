@@ -4,13 +4,17 @@ import {main} from '../models';
 
 export function AnalyzePitch(arg1:string,arg2:string):Promise<main.PitchResult>;
 
-export function ConvertBatch(arg1:Array<main.FileInfo>,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string):Promise<Array<main.ConvertResult>>;
+export function ConvertBatch(arg1:Array<main.FileInfo>,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<Array<main.ConvertResult>>;
 
-export function ConvertFile(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string):Promise<main.ConvertResult>;
+export function ConvertFile(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<main.ConvertResult>;
 
 export function GetDetectors():Promise<Array<string>>;
 
+export function GetEQPresets():Promise<Array<main.EQPreset>>;
+
 export function GetSupportedFormats():Promise<Array<string>>;
+
+export function PreviewFile(arg1:string,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<string>;
 
 export function SelectFiles():Promise<Array<main.FileInfo>>;
 

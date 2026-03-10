@@ -28,6 +28,24 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
+	export class EQPreset {
+	    name: string;
+	    bass: number;
+	    mid: number;
+	    treble: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EQPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.bass = source["bass"];
+	        this.mid = source["mid"];
+	        this.treble = source["treble"];
+	    }
+	}
 	export class FileInfo {
 	    path: string;
 	    name: string;

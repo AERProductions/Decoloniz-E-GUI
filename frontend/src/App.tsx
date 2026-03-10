@@ -7,6 +7,8 @@ import {
   ConvertBatch,
   GetDetectors,
   GetSupportedFormats,
+  GetEQPresets,
+  PreviewFile,
 } from '../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 
@@ -45,6 +47,30 @@ function App() {
   const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, currentFile: '' });
   const [summary, setSummary] = useState<{ converted: number; skipped: number; errors: number } | null>(null);
+
+  // EQ state
+  const [eqPreset, setEqPreset] = useState('Flat');
+  const [eqBass, setEqBass] = useState(0);
+  const [eqMid, setEqMid] = useState(0);
+  const [eqTreble, setEqTreble] = useState(0);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+
+  const eqPresets: Record<string, { bass: number; mid: number; treble: number }> = {
+    Flat:   { bass: 0, mid: 0, treble: 0 },
+    Warm:   { bass: 3, mid: 0, treble: -2 },
+    Deep:   { bass: 6, mid: -2, treble: -1 },
+    Bright: { bass: -1, mid: 0, treble: 4 },
+  };
+
+  const applyPreset = (name: string) => {
+    setEqPreset(name);
+    if (name !== 'Custom') {
+      const p = eqPresets[name] || eqPresets.Flat;
+      setEqBass(p.bass);
+      setEqMid(p.mid);
+      setEqTreble(p.treble);
+    }
+  };
 
   const addFiles = useCallback(async () => {
     try {
@@ -112,7 +138,7 @@ function App() {
 
     try {
       const fileInfos = files.map(f => ({ path: f.path, name: f.name, size: f.size, extension: f.extension }));
-      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag);
+      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble);
 
       let converted = 0, skipped = 0, errors = 0;
       setFiles(prev => prev.map((f, i) => {
@@ -139,6 +165,17 @@ function App() {
   const clearAll = () => {
     setFiles([]);
     setSummary(null);
+  };
+
+  const previewFile = async (path: string) => {
+    setPreviewing(path);
+    try {
+      await PreviewFile(path, targetHz, detectorName, eqBass, eqMid, eqTreble);
+    } catch (e: any) {
+      console.error('Preview error:', e);
+    } finally {
+      setPreviewing(null);
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -226,6 +263,34 @@ function App() {
             ))}
           </div>
         </div>
+
+        {/* EQ Controls */}
+        <div className="controls-row controls-eq">
+          <label className="eq-label">
+            EQ
+            <select value={eqPreset} onChange={e => applyPreset(e.target.value)} className="input-sm input-eq-select">
+              {Object.keys(eqPresets).map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+              <option value="Custom">Custom</option>
+            </select>
+          </label>
+          <label className="eq-slider">
+            Bass
+            <input type="range" min={-10} max={10} step={0.5} value={eqBass} onChange={e => { setEqBass(Number(e.target.value)); setEqPreset('Custom'); }} />
+            <span className="eq-val">{eqBass > 0 ? '+' : ''}{eqBass}</span>
+          </label>
+          <label className="eq-slider">
+            Mid
+            <input type="range" min={-10} max={10} step={0.5} value={eqMid} onChange={e => { setEqMid(Number(e.target.value)); setEqPreset('Custom'); }} />
+            <span className="eq-val">{eqMid > 0 ? '+' : ''}{eqMid}</span>
+          </label>
+          <label className="eq-slider">
+            Treble
+            <input type="range" min={-10} max={10} step={0.5} value={eqTreble} onChange={e => { setEqTreble(Number(e.target.value)); setEqPreset('Custom'); }} />
+            <span className="eq-val">{eqTreble > 0 ? '+' : ''}{eqTreble}</span>
+          </label>
+        </div>
       </section>
 
       {/* Progress bar */}
@@ -267,7 +332,12 @@ function App() {
                   <td>{statusBadge(f.status)}</td>
                   <td>
                     {!converting && (
-                      <button className="btn-remove" onClick={() => removeFile(i)} title="Remove">×</button>
+                      <span className="row-actions">
+                        <button className="btn-preview" onClick={() => previewFile(f.path)} disabled={previewing === f.path} title="Preview 30s clip">
+                          {previewing === f.path ? '...' : '▶'}
+                        </button>
+                        <button className="btn-remove" onClick={() => removeFile(i)} title="Remove">×</button>
+                      </span>
                     )}
                   </td>
                 </tr>

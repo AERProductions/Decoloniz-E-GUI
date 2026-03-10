@@ -264,3 +264,75 @@ tr:hover { background: #141414; }
   font-size: 11px;
   background: #0a0a0a;
 }
+
+/* === EQ Controls === */
+.controls-eq {
+  margin-top: 8px;
+  align-items: center;
+}
+.eq-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+}
+.input-eq-select {
+  width: 80px;
+}
+.eq-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+}
+.eq-slider input[type="range"] {
+  width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.eq-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffd700;
+  cursor: pointer;
+}
+.eq-val {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  min-width: 28px;
+  color: #aaa;
+}
+
+/* === Row Actions === */
+.row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.btn-preview {
+  background: none;
+  border: 1px solid #333;
+  border-radius: 3px;
+  color: #ffd700;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 6px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-preview:hover:not(:disabled) {
+  border-color: #ffd700;
+}
+.btn-preview:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
