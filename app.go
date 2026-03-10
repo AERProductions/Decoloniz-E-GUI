@@ -71,6 +71,28 @@ type EQPreset struct {
 	Treble float64 `json:"treble"`
 }
 
+// StatFiles takes a list of file paths (e.g. from drag-and-drop) and returns
+// FileInfo for each valid audio file.
+func (a *App) StatFiles(paths []string) []FileInfo {
+	var files []FileInfo
+	for _, p := range paths {
+		if !audio.IsSupportedFile(p) {
+			continue
+		}
+		info, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		files = append(files, FileInfo{
+			Path:      p,
+			Name:      filepath.Base(p),
+			Size:      info.Size(),
+			Extension: strings.ToLower(filepath.Ext(p)),
+		})
+	}
+	return files
+}
+
 // --- File dialogs ---
 
 func (a *App) SelectFiles() ([]FileInfo, error) {
@@ -204,7 +226,7 @@ func (a *App) AnalyzePitch(filePath string, detectorName string) PitchResult {
 
 // --- Conversion ---
 
-func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64) ConvertResult {
+func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int) ConvertResult {
 	det := pickDetector(detectorName)
 
 	samples, sampleRate, err := audio.DecodeToPCM(inPath)
@@ -238,6 +260,13 @@ func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold fl
 
 	ratio := targetHz / detected
 
+	// Handle output format conversion — change extension if format specified
+	if outputFormat != "" && outputFormat != "original" {
+		ext := "." + outputFormat
+		base := strings.TrimSuffix(filepath.Base(outPath), filepath.Ext(outPath))
+		outPath = filepath.Join(filepath.Dir(outPath), base+ext)
+	}
+
 	outDir := filepath.Dir(outPath)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return ConvertResult{InputPath: inPath, Error: fmt.Sprintf("mkdir: %v", err)}
@@ -248,14 +277,14 @@ func (a *App) ConvertFile(inPath, outPath string, targetHz float64, threshold fl
 		eq = &audio.EQSettings{Bass: bass, Mid: mid, Treble: treble}
 	}
 
-	if err := audio.ConvertFormant(inPath, outPath, ratio, eq, tag); err != nil {
+	if err := audio.ConvertFormant(inPath, outPath, ratio, eq, tag, quality); err != nil {
 		return ConvertResult{InputPath: inPath, Error: fmt.Sprintf("convert: %v", err)}
 	}
 
 	return ConvertResult{InputPath: inPath, OutputPath: outPath, DetectedHz: detected, Confidence: confidence, TargetHz: targetHz, Ratio: ratio, Warning: warning}
 }
 
-func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64) []ConvertResult {
+func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64, threshold float64, detectorName string, tag string, bass, mid, treble float64, outputFormat string, quality int) []ConvertResult {
 	var results []ConvertResult
 	total := len(files)
 
@@ -267,7 +296,7 @@ func (a *App) ConvertBatch(files []FileInfo, outputDir string, targetHz float64,
 		})
 
 		outPath := filepath.Join(outputDir, f.Name)
-		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag, bass, mid, treble)
+		r := a.ConvertFile(f.Path, outPath, targetHz, threshold, detectorName, tag, bass, mid, treble, outputFormat, quality)
 		results = append(results, r)
 	}
 

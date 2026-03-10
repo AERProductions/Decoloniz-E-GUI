@@ -4,9 +4,9 @@ import {main} from '../models';
 
 export function AnalyzePitch(arg1:string,arg2:string):Promise<main.PitchResult>;
 
-export function ConvertBatch(arg1:Array<main.FileInfo>,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<Array<main.ConvertResult>>;
+export function ConvertBatch(arg1:Array<main.FileInfo>,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number,arg10:string,arg11:number):Promise<Array<main.ConvertResult>>;
 
-export function ConvertFile(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<main.ConvertResult>;
+export function ConvertFile(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number,arg10:string,arg11:number):Promise<main.ConvertResult>;
 
 export function GetDetectors():Promise<Array<string>>;
 
@@ -19,3 +19,5 @@ export function PreviewFile(arg1:string,arg2:number,arg3:string,arg4:number,arg5
 export function SelectFiles():Promise<Array<main.FileInfo>>;
 
 export function SelectFolder():Promise<string>;
+
+export function StatFiles(arg1:Array<string>):Promise<Array<main.FileInfo>>;

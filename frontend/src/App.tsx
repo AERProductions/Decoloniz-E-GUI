@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import './App.css';
 import {
   SelectFiles,
@@ -9,8 +9,9 @@ import {
   GetSupportedFormats,
   GetEQPresets,
   PreviewFile,
+  StatFiles,
 } from '../wailsjs/go/main/App';
-import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
+import { EventsOn, EventsOff, OnFileDrop } from '../wailsjs/runtime/runtime';
 
 interface FileEntry {
   path: string;
@@ -55,6 +56,14 @@ function App() {
   const [eqTreble, setEqTreble] = useState(0);
   const [previewing, setPreviewing] = useState<string | null>(null);
 
+  // Output format & quality
+  const [outputFormat, setOutputFormat] = useState('original');
+  const [quality, setQuality] = useState(6);
+
+  // Drag-and-drop state
+  const [dragging, setDragging] = useState(false);
+  const dragCounter = useRef(0);
+
   const eqPresets: Record<string, { bass: number; mid: number; treble: number }> = {
     Flat:   { bass: 0, mid: 0, treble: 0 },
     Warm:   { bass: 3, mid: 0, treble: -2 },
@@ -71,6 +80,55 @@ function App() {
       setEqTreble(p.treble);
     }
   };
+
+  // --- Drag and Drop via Wails native ---
+  useEffect(() => {
+    OnFileDrop((_x: number, _y: number, paths: string[]) => {
+      if (!paths || paths.length === 0) return;
+      StatFiles(paths).then((statted: any[]) => {
+        if (!statted || statted.length === 0) return;
+        const newFiles: FileEntry[] = statted.map((f: any) => ({
+          path: f.path,
+          name: f.name,
+          size: f.size,
+          extension: f.extension,
+          status: 'pending' as const,
+        }));
+        setFiles(prev => {
+          const existing = new Set(prev.map(f => f.path));
+          return [...prev, ...newFiles.filter(f => !existing.has(f.path))];
+        });
+      });
+      setDragging(false);
+      dragCounter.current = 0;
+    }, true);
+  }, []);
+
+  // HTML drag visual feedback
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    setDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      setDragging(false);
+      dragCounter.current = 0;
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    dragCounter.current = 0;
+  }, []);
 
   const addFiles = useCallback(async () => {
     try {
@@ -138,7 +196,7 @@ function App() {
 
     try {
       const fileInfos = files.map(f => ({ path: f.path, name: f.name, size: f.size, extension: f.extension }));
-      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble);
+      const results: ConvertResult[] = await ConvertBatch(fileInfos, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality);
 
       let converted = 0, skipped = 0, errors = 0;
       setFiles(prev => prev.map((f, i) => {
@@ -156,7 +214,7 @@ function App() {
       EventsOff('conversion-progress');
       setConverting(false);
     }
-  }, [files, outputDir, targetHz, threshold, detectorName, tag]);
+  }, [files, outputDir, targetHz, threshold, detectorName, tag, eqBass, eqMid, eqTreble, outputFormat, quality]);
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
@@ -187,12 +245,12 @@ function App() {
   const statusBadge = (status: string) => {
     const map: Record<string, { label: string; cls: string }> = {
       pending: { label: '—', cls: 'badge-dim' },
-      analyzing: { label: '...', cls: 'badge-cyan' },
+      analyzing: { label: '⟳', cls: 'badge-cyan' },
       ready: { label: 'Ready', cls: 'badge-cyan' },
-      converting: { label: 'Converting', cls: 'badge-yellow' },
-      done: { label: 'OK', cls: 'badge-green' },
+      converting: { label: '⟳', cls: 'badge-yellow' },
+      done: { label: '✓', cls: 'badge-green' },
       skipped: { label: 'Skip', cls: 'badge-yellow' },
-      error: { label: 'Error', cls: 'badge-red' },
+      error: { label: '✗', cls: 'badge-red' },
     };
     const s = map[status] || map.pending;
     return <span className={`badge ${s.cls}`}>{s.label}</span>;
@@ -213,11 +271,34 @@ function App() {
     );
   };
 
+  const qualityLabel = (q: number) => {
+    if (q <= 2) return 'Low';
+    if (q <= 4) return 'Med';
+    if (q <= 6) return 'Good';
+    if (q <= 8) return 'High';
+    return 'Max';
+  };
+
   const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   return (
-    <div className="app">
-      {/* Header */}
+    <div
+      className={`app ${dragging ? 'app-drag-over' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      style={{ '--wails-drop-target': 'drop' } as React.CSSProperties}
+    >
+      {/* Drag overlay */}
+      {dragging && (
+        <div className="drop-overlay">
+          <div className="drop-overlay-content">
+            <span className="drop-icon">♫</span>
+            <span className="drop-text">Drop audio files here</span>
+          </div>
+        </div>
+      )}      {/* Header */}
       <header className="header">
         <h1 className="title">Decoloniz<span className="gold">-E</span></h1>
         <p className="subtitle">432Hz Resonance Engine</p>
@@ -226,13 +307,15 @@ function App() {
       {/* Controls */}
       <section className="controls">
         <div className="controls-row">
-          <button className="btn btn-primary" onClick={addFiles} disabled={converting}>Add Files</button>
+          <button className="btn btn-primary" onClick={addFiles} disabled={converting}>+ Add Files</button>
           <button className="btn" onClick={chooseOutput} disabled={converting}>
-            {outputDir ? `Output: ${outputDir.split('\\').pop()}` : 'Output Folder'}
+            {outputDir ? `📁 ${outputDir.split('\\').pop()}` : '📁 Output Folder'}
           </button>
-          <button className="btn btn-accent" onClick={analyzeAll} disabled={converting || files.length === 0}>Analyze</button>
+          <button className="btn btn-accent" onClick={analyzeAll} disabled={converting || files.length === 0}>
+            Analyze{files.length > 0 ? ` (${files.length})` : ''}
+          </button>
           <button className="btn btn-green" onClick={convertAll} disabled={converting || files.length === 0 || !outputDir}>
-            {converting ? `Converting ${progress.current}/${progress.total}` : 'Convert'}
+            {converting ? `Converting ${progress.current}/${progress.total}` : `Convert${files.length > 0 ? ` (${files.length})` : ''}`}
           </button>
           <button className="btn btn-dim" onClick={clearAll} disabled={converting}>Clear</button>
         </div>
@@ -262,6 +345,27 @@ function App() {
               <button key={hz} className={`btn-preset ${targetHz === hz ? 'active' : ''}`} onClick={() => setTargetHz(hz)}>{hz}</button>
             ))}
           </div>
+        </div>
+
+        {/* Output Format & Quality */}
+        <div className="controls-row controls-output">
+          <label>
+            Format
+            <select value={outputFormat} onChange={e => setOutputFormat(e.target.value)} className="input-sm input-format">
+              <option value="original">Original</option>
+              <option value="flac">FLAC</option>
+              <option value="ogg">OGG</option>
+              <option value="mp3">MP3</option>
+              <option value="opus">Opus</option>
+              <option value="wav">WAV</option>
+              <option value="m4a">M4A</option>
+            </select>
+          </label>
+          <label className="quality-slider">
+            Quality
+            <input type="range" min={1} max={10} step={1} value={quality} onChange={e => setQuality(Number(e.target.value))} />
+            <span className="quality-val">{quality} <span className="dim">({qualityLabel(quality)})</span></span>
+          </label>
         </div>
 
         {/* EQ Controls */}
@@ -305,8 +409,10 @@ function App() {
       <section className="file-list">
         {files.length === 0 ? (
           <div className="empty-state">
-            <p>No files added yet</p>
-            <p className="dim">Click "Add Files" or drag audio files onto this window</p>
+            <span className="empty-icon">♫</span>
+            <p className="empty-title">No files added yet</p>
+            <p className="dim">Click <strong>+ Add Files</strong> or drag audio files onto this window</p>
+            <p className="dim empty-formats">flac · ogg · mp3 · wav · m4a · opus · wma · aac</p>
           </div>
         ) : (
           <table>
@@ -323,7 +429,7 @@ function App() {
             </thead>
             <tbody>
               {files.map((f, i) => (
-                <tr key={f.path} className={f.status === 'error' ? 'row-error' : ''}>
+                <tr key={f.path} className={`file-row ${f.status === 'error' ? 'row-error' : ''} ${f.status === 'done' ? 'row-done' : ''}`}>
                   <td className="cell-name" title={f.path}>{f.name}</td>
                   <td className="cell-size">{formatSize(f.size)}</td>
                   <td className="cell-hz">{f.detectedHz ? `${f.detectedHz.toFixed(2)} Hz` : '—'}</td>
@@ -334,7 +440,7 @@ function App() {
                     {!converting && (
                       <span className="row-actions">
                         <button className="btn-preview" onClick={() => previewFile(f.path)} disabled={previewing === f.path} title="Preview 30s clip">
-                          {previewing === f.path ? '...' : '▶'}
+                          {previewing === f.path ? '⟳' : '▶'}
                         </button>
                         <button className="btn-remove" onClick={() => removeFile(i)} title="Remove">×</button>
                       </span>
@@ -350,11 +456,11 @@ function App() {
       {/* Summary */}
       {summary && (
         <footer className="summary">
-          <span className="green">{summary.converted} converted</span>
+          <span className="green">✓ {summary.converted} converted</span>
           <span className="sep">·</span>
-          <span className="yellow">{summary.skipped} skipped</span>
+          <span className="yellow">→ {summary.skipped} skipped</span>
           <span className="sep">·</span>
-          <span className="red">{summary.errors} errors</span>
+          <span className="red">✗ {summary.errors} errors</span>
           <span className="sep">·</span>
           <span className="dim">{files.length} total</span>
         </footer>
@@ -364,6 +470,9 @@ function App() {
       <footer className="status-bar">
         <span className="dim">{files.length} file{files.length !== 1 ? 's' : ''}</span>
         <span className="dim">Detector: {detectorName.toUpperCase()}</span>
+        <span className="dim">
+          {outputFormat === 'original' ? 'Original format' : outputFormat.toUpperCase()} · Q{quality}
+        </span>
         <span className="dim">Target: {targetHz} Hz</span>
       </footer>
     </div>
